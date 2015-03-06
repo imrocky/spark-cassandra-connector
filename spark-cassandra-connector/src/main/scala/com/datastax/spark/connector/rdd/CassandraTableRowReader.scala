@@ -9,8 +9,14 @@ import com.datastax.spark.connector.rdd.reader._
 
 import scala.reflect.ClassTag
 
-trait CassandraReader[R] {
-
+/**
+ * Used to get a RowReader of type [R] for transforming the rows of a particular Cassandra table into
+ * scala objects. Performs necessary checking of the schema and output class to make sure they are
+ * compatible.
+ * @see [[CassandraTableScanRDD]]
+ * @see [[CassandraJoinRDD]]
+ */
+trait CassandraTableRowReader[R] {
 
   protected def connector: CassandraConnector
 
@@ -34,7 +40,7 @@ trait CassandraReader[R] {
    */
   protected val rtf: RowReaderFactory[R]
   protected val rct: ClassTag[R]
-  protected lazy val rowTransformer: RowReader[R] = rtf.rowReader(tableDef)
+  protected lazy val rowReader: RowReader[R] = rtf.rowReader(tableDef)
 
   lazy val tableDef = {
     Schema.fromCassandra(connector, Some(keyspaceName), Some(tableName)).tables.headOption match {
@@ -80,7 +86,7 @@ trait CassandraReader[R] {
         case SomeColumns(cs@_*) => checkColumnsExistence(cs)
       }
 
-    (rowTransformer.columnNames, rowTransformer.requiredColumns) match {
+    (rowReader.columnNames, rowReader.requiredColumns) match {
       case (Some(cs), None) => providedColumnNames.filter(columnName => cs.toSet(columnName.selectedAs))
       case (_, _) => providedColumnNames
     }
@@ -93,7 +99,7 @@ trait CassandraReader[R] {
       case SomeColumns(cs@_*) => checkColumnsExistence(cs)
     }
 
-  (rowTransformer.columnNames, rowTransformer.requiredColumns) match {
+  (rowReader.columnNames, rowReader.requiredColumns) match {
     case (Some(cs), None) => providedColumnNames.filter(columnName => cs.toSet(columnName.selectedAs))
     case (_, _) => providedColumnNames
   }
@@ -148,14 +154,14 @@ trait CassandraReader[R] {
 
     tableDef.allColumns // will throw IOException if table does not exist
 
-    rowTransformer.columnNames match {
+    rowReader.columnNames match {
       case Some(names) =>
         val missingColumns = names.toSet -- selectedColumnNames.map(_.selectedAs).toSet
         assert(missingColumns.isEmpty, s"Missing columns needed by $targetType: ${missingColumns.mkString(", ")}")
       case None =>
     }
 
-    rowTransformer.requiredColumns match {
+    rowReader.requiredColumns match {
       case Some(count) =>
         assert(selectedColumnNames.size >= count,
           s"Not enough columns selected for the target row type $targetType: ${selectedColumnNames.size} < $count")

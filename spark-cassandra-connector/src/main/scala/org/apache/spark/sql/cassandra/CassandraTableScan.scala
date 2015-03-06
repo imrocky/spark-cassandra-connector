@@ -57,12 +57,12 @@ case class CassandraTableScan(
 
   private[this] def predicateOperator(predicate: Expression): String = {
     predicate match {
-      case _: EqualTo => "="
-      case _: LessThan => "<"
-      case _: LessThanOrEqual => "<="
-      case _: GreaterThan => ">"
+      case _: EqualTo =>            "="
+      case _: LessThan =>           "<"
+      case _: LessThanOrEqual =>    "<="
+      case _: GreaterThan =>        ">"
       case _: GreaterThanOrEqual => ">="
-      case _: In | _: InSet => "IN"
+      case _: In | _: InSet =>      "IN"
       case _ => throw new UnsupportedOperationException(
         "It's not a valid predicate to be pushed down, only >, <, >=, <= and In are allowed: " + predicate)
     }

@@ -28,14 +28,14 @@ class EmptyCassandraRDD[R](@transient sc: SparkContext,
       columnNames match {
         case AllColumns => Seq()
         case PartitionKeyColumns => Seq()
-        case SomeColumns(cs@_*) => (cs)
+        case SomeColumns(cs@_*) => cs
       }
     providedColumnNames
   }
 
   override protected def connector: CassandraConnector = throw new UnsupportedOperationException("Empty Cassandra RDD's Don't Have Connections to Cassandra")
 
-  override def toEmptyCassandraRDD(): EmptyCassandraRDD[R] = copy()
+  override def toEmptyCassandraRDD: EmptyCassandraRDD[R] = copy()
 
   override protected def narrowColumnSelection(columns: Seq[NamedColumnRef]): Seq[NamedColumnRef] = columns
 }

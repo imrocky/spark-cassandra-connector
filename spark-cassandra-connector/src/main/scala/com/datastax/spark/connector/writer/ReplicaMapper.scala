@@ -37,7 +37,7 @@ class ReplicaMapper[T] private(
    * partition tokens from tables. We prepare a statement of the form SELECT * FROM keyspace.table
    * where x= .... This statement is never executed.
    */
-  private lazy val querySelectUsingOnlyParititonKeys: String = {
+  private lazy val querySelectUsingOnlyPartitionKeys: String = {
     val partitionKeys = tableDef.partitionKey
     def quotedColumnNames(columns: Seq[ColumnDef]) = partitionKeys.map(_.columnName).map(quote)
     val whereClause = quotedColumnNames(partitionKeys).map(c => s"$c = :$c").mkString(" AND ")
@@ -46,11 +46,11 @@ class ReplicaMapper[T] private(
 
   private def prepareDummyStatement(session: Session): PreparedStatement = {
     try {
-      session.prepare(querySelectUsingOnlyParititonKeys)
+      session.prepare(querySelectUsingOnlyPartitionKeys)
     }
     catch {
       case t: Throwable =>
-        throw new IOException(s"Failed to prepare statement $querySelectUsingOnlyParititonKeys: " + t.getMessage, t)
+        throw new IOException(s"Failed to prepare statement $querySelectUsingOnlyPartitionKeys: " + t.getMessage, t)
     }
   }
 
@@ -60,19 +60,18 @@ class ReplicaMapper[T] private(
    * @return an Iterator over the same data keyed by the replica's ip addresses
    */
   def keyByReplicas(data: Iterator[T]): Iterator[(scala.collection.immutable.Set[InetAddress], T)] = {
-    connector.withClusterDo { cluster =>
       connector.withSessionDo { session =>
         val stmt = prepareDummyStatement(session)
         val routingKeyGenerator = new RoutingKeyGenerator(tableDef, columnNames)
         val boundStmtBuilder = new BoundStatementBuilder(rowWriter, stmt, protocolVersion)
+        val clusterMetadata = session.getCluster.getMetadata
         data.map { row =>
-          val hosts = cluster.getMetadata
+          val hosts = clusterMetadata
             .getReplicas(keyspaceName, routingKeyGenerator.apply(boundStmtBuilder.bind(row)))
             .map(_.getAddress)
             .toSet[InetAddress]
           (hosts, row)
         }
-      }
     }
   }
 }

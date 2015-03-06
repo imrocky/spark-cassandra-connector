@@ -21,7 +21,7 @@ protected[connector] class CassandraPartitionedRDD[T](prev: RDD[T])(implicit ct:
    */
   override def getPartitions: Array[Partition] = {
     partitioner match {
-      case Some(rp: ReplicaPartitioner) => prev.partitions.map(partition => rp.getEndpointParititon(partition))
+      case Some(rp: ReplicaPartitioner) => prev.partitions.map(partition => rp.getEndpointPartition(partition))
       case _ => throw new IllegalArgumentException("CassandraPartitionedRDD hasn't been partitioned by ReplicaPartitioner. This should be impossible")
     }
   }

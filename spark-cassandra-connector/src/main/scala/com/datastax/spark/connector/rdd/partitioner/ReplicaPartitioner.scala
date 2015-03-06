@@ -21,9 +21,9 @@ class ReplicaPartitioner(partitionsPerReplicaSet: Int, connector: CassandraConne
   val hosts = connector.hosts.toVector
   val numHosts = hosts.size
   val partitionIndexes = (0 until partitionsPerReplicaSet * numHosts).grouped(partitionsPerReplicaSet).toList
-  val hostMap = hosts zip partitionIndexes toMap
+  val hostMap = (hosts zip partitionIndexes).toMap
   // Ip1 -> (0,1,2,..), Ip2 -> (11,12,13...)
-  val indexMap = hostMap flatMap { case (ip, partitions) => partitions.map(partition => (partition, ip))}
+  val indexMap = for ((ip, partitions) <- hostMap; partition <- partitions) yield (partition, ip)
   // 0->IP1, 1-> IP1, ...
   val rand = new java.util.Random()
 
@@ -34,14 +34,19 @@ class ReplicaPartitioner(partitionsPerReplicaSet: Int, connector: CassandraConne
    * @return An integer between 0 and numPartitions
    */
   override def getPartition(key: Any): Int = {
-    val replicaSet = key.asInstanceOf[Set[InetAddress]].toVector
-    val endpoint = replicaSet(rand.nextInt(replicaSet.size))
-    hostMap.getOrElse(endpoint, hostMap(hosts(rand.nextInt(numHosts))))(rand.nextInt(partitionsPerReplicaSet))
+    key match {
+      case key: Set[InetAddress] => {
+        val replicaSet = key.asInstanceOf[Set[InetAddress]].toVector
+        val endpoint = replicaSet(rand.nextInt(replicaSet.size))
+        hostMap.getOrElse(endpoint, hostMap(hosts(rand.nextInt(numHosts))))(rand.nextInt(partitionsPerReplicaSet))
+      }
+      case _ => throw new IllegalArgumentException("ReplicaPartitioner can only determine the partition of tuples whose keys that are of type Set[InetAddress]")
+    }
   }
 
   override def numPartitions: Int = partitionsPerReplicaSet * numHosts
 
-  def getEndpointParititon(partition: Partition): ReplicaPartition = {
+  def getEndpointPartition(partition: Partition): ReplicaPartition = {
     val endpoints = indexMap.getOrElse(partition.index,
       throw new RuntimeException(s"${indexMap} : Can't get an endpoint for Partition $partition.index"))
     new ReplicaPartition(index = partition.index, endpoints = Set(endpoints))

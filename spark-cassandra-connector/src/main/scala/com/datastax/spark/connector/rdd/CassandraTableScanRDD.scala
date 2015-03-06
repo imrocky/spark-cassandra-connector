@@ -54,7 +54,7 @@ class CassandraTableScanRDD[R] private[connector](
                                                    val readConf: ReadConf = ReadConf())
                                                  (implicit val rct: ClassTag[R],
                                                   @transient val rtf: RowReaderFactory[R])
-  extends CassandraRDD[R](sc, Seq.empty) with CassandraReader[R] {
+  extends CassandraRDD[R](sc, Seq.empty) with CassandraTableRowReader[R] {
 
   override protected def copy(columnNames: ColumnSelector = columnNames,
                               where: CqlWhereClause = where,
@@ -72,7 +72,7 @@ class CassandraTableScanRDD[R] private[connector](
 
 
   override def getPartitions: Array[Partition] = {
-    verify // let's fail fast
+    verify() // let's fail fast
     val tf = TokenFactory.forCassandraPartitioner(cassandraPartitionerClassName)
     val partitions = new CassandraRDDPartitioner(connector, tableDef, splitSize)(tf).partitions(where)
     logDebug(s"Created total ${partitions.size} partitions for $keyspaceName.$tableName.")
@@ -126,7 +126,7 @@ class CassandraTableScanRDD[R] private[connector](
       tc.map(_.stop())
       val iterator = new PrefetchingResultSetIterator(rs, fetchSize)
       val iteratorWithMetrics = iterator.map(inputMetricsUpdater.updateMetrics)
-      val result = iteratorWithMetrics.map(rowTransformer.read(_, columnNamesArray))
+      val result = iteratorWithMetrics.map(rowReader.read(_, columnNamesArray))
       logDebug(s"Row iterator for range ${range.cql} obtained successfully.")
       result
     } catch {

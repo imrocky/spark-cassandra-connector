@@ -16,6 +16,10 @@ case class NotWholePartKey(pk1: Int)
 
 case class MissingClustering(pk1: Int, pk2: Int, pk3: Int, cc2: Int)
 
+case class MissingClustering2(pk1: Int, pk2: Int, pk3: Int, cc3: Int, cc1: Int)
+
+case class MissingClustering3(pk1: Int, pk2: Int, pk3: Int, cc1: Int, cc3: Int)
+
 case class DataCol(pk1: Int, pk2: Int, pk3: Int, d1: Int)
 
 class RDDSpec extends FlatSpec with Matchers with SharedEmbeddedCassandra with SparkTemplate {
@@ -318,6 +322,20 @@ class RDDSpec extends FlatSpec with Matchers with SharedEmbeddedCassandra with S
     intercept[IllegalArgumentException] {
       val someCass = sc.parallelize(keys).map(x => new MissingClustering(x, x, x, x)).joinWithCassandraTable(keyspace, manyColsTable).on(SomeColumns("pk1", "pk2", "pk3", "cc2"))
     }
+  }
+
+  it should " throw an exception if you try to join on later clustering columns without earlier ones even when out of order" in {
+    intercept[IllegalArgumentException] {
+      val someCass = sc.parallelize(keys).map(x => new MissingClustering2(x, x, x, x, x)).joinWithCassandraTable(keyspace, manyColsTable).on(SomeColumns("pk1", "pk2", "pk3", "cc3", "cc1"))
+    }
+
+  }
+
+  it should " throw an exception if you try to join on later clustering columns without earlier ones even when reversed" in {
+    intercept[IllegalArgumentException] {
+      val someCass = sc.parallelize(keys).map(x => new MissingClustering3(x, x, x, x, x)).joinWithCassandraTable(keyspace, manyColsTable).on(SomeColumns("pk1", "pk2", "pk3", "cc1", "cc3"))
+    }
+
   }
 
   it should " throw an exception if you try to join with a data column" in {
